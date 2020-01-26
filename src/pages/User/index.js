@@ -1,6 +1,5 @@
 import React, { Component } from 'react';
 import PropTypes from 'prop-types';
-import { ActivityIndicator } from 'react-native';
 import api from '../../services/api';
 
 import {
@@ -15,6 +14,7 @@ import {
   Info,
   Tittle,
   Author,
+  Load,
 } from './styles';
 
 export default class User extends Component {
@@ -29,25 +29,48 @@ export default class User extends Component {
   };
 
   state = {
-    starts: [],
-    loading: false,
+    stars: [],
+    loading: true,
+    page: 1,
+    refreshing: false,
   };
 
-  async componentDidMount() {
+  componentDidMount() {
+    this.init();
+  }
+
+  init = async (page = 1) => {
     const { navigation } = this.props;
 
-    this.setState({ loading: true });
+    const { stars } = this.state;
+
     const user = navigation.getParam('user');
 
-    const response = await api.get(`/users/${user.login}/starred`);
+    const response = await api.get(`/users/${user.login}/starred`, {
+      params: { page },
+    });
 
-    this.setState({ starts: response.data, loading: false });
-  }
+    const data = page > 1 ? [...stars, ...response.data] : response.data;
+
+    console.tron.log(page);
+    console.tron.log(data);
+    this.setState({ stars: data, page, loading: false, refreshing: false });
+  };
+
+  loadMore = () => {
+    const { page } = this.state;
+
+    this.init(page + 1);
+  };
+
+  refreshList = () => {
+    this.setState({ refreshing: true, stars: [] }, this.init);
+  };
 
   render() {
     const { navigation } = this.props;
 
-    const { starts, loading } = this.state;
+    const { stars, loading, refreshing } = this.state;
 
     const user = navigation.getParam('user');
 
@@ -60,10 +83,12 @@ export default class User extends Component {
         </Header>
 
         {loading ? (
-          <ActivityIndicator color="#376191" />
+          <Load />
         ) : (
           <Stars
-            data={starts}
+            data={stars}
+            onRefresh={this.refreshList}
+            refreshing={refreshing}
             keyExtractor={star => String(star.id)}
             renderItem={({ item }) => (
               <Starred>
@@ -74,6 +99,8 @@ export default class User extends Component {
                 </Info>
               </Starred>
             )}
+            onEndReachedThreshold={0.5}
+            onEndReached={this.loadMore}
           />
         )}
       </Container>
